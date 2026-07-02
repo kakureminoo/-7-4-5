@@ -65,3 +65,16 @@ button {
     font-size: 24px;
     padding: 15px;
 }
+/* 置けるマスの中心に薄いハイライトを表示（お好みで色や薄さは調整してください） */
+.cell.can-place::after {
+    content: "";
+    width: 20px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.4); /* 白の半透明 */
+    border-radius: 50%;
+}
+
+/* ホバーしたときに少し明るくして、より分かりやすくする */
+.cell.can-place:hover {
+    background: #00a000;
+}
