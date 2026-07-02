@@ -42,3 +42,26 @@ button {
     padding: 10px 20px;
     font-size: 16px;
 }
+#title-screen {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+#title-screen h1 {
+    font-size: 64px;
+    margin: 0;
+}
+
+#title-screen p {
+    color: #cccccc;
+}
+
+#title-screen button {
+    width: 220px;
+    font-size: 24px;
+    padding: 15px;
+}
