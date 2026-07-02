@@ -9,6 +9,8 @@ const statusElement = document.getElementById("status");
 
 const SIZE = 8;
 
+print(データ構造教えて)
+
 let currentPlayer = 1; // 1=黒,2=白
 let board = [];
 
