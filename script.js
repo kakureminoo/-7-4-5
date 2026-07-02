@@ -36,6 +36,15 @@ function render() {
             const cell = document.createElement("div");
             cell.className = "cell";
 
+            // ★ ここから追加：置けるマスかどうかの判定
+            if (board[y][x] === 0) {
+                const flipped = getFlips(x, y);
+                if (flipped.length > 0) {
+                    cell.classList.add("can-place"); // 置けるマスにクラスを付与
+                }
+            }
+            // ★ ここまで追加
+
             cell.onclick = () => placeDisk(x, y);
 
             if (board[y][x] !== 0) {
