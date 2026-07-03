@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 const PORT = 3001;
@@ -11,16 +12,8 @@ const DIRECTIONS = [
   [-1,1],[0,1],[1,1]
 ];
 
-const POSITION_WEIGHTS = [
-  [100, -20, 10, 5, 5, 10, -20, 100],
-  [-20, -50, -2, -2, -2, -2, -50, -20],
-  [10, -2, 0, 0, 0, 0, -2, 10],
-  [5, -2, 0, 0, 0, 0, -2, 5],
-  [5, -2, 0, 0, 0, 0, -2, 5],
-  [10, -2, 0, 0, 0, 0, -2, 10],
-  [-20, -50, -2, -2, -2, -2, -50, -20],
-  [100, -20, 10, 5, 5, 10, -20, 100]
-];
+// Gemini API の初期化
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.use(cors());
 app.use(express.json());
@@ -73,29 +66,35 @@ function getValidMoves(board, player) {
   return moves;
 }
 
-function scoreMove(move) {
-  const weight = POSITION_WEIGHTS[move.y][move.x] || 0;
-  return move.flips.length * 5 + weight;
-}
-
-function chooseBestMove(moves) {
-  let bestScore = -Infinity;
-  let bestMoves = [];
-
-  for (const move of moves) {
-    const score = scoreMove(move);
-    if (score > bestScore) {
-      bestScore = score;
-      bestMoves = [move];
-    } else if (score === bestScore) {
-      bestMoves.push(move);
+function describeBoardState(board, player, validMoves) {
+  const playerName = player === 1 ? "Black (1)" : "White (2)";
+  const opponentName = player === 1 ? "White (2)" : "Black (1)";
+  
+  let description = `Player: ${playerName}\n\nBoard (8x8):\n`;
+  
+  // ボード表示
+  for (let y = 0; y < SIZE; y++) {
+    let row = "";
+    for (let x = 0; x < SIZE; x++) {
+      if (board[y][x] === 0) row += ". ";
+      else if (board[y][x] === 1) row += "B ";
+      else row += "W ";
     }
+    description += row + "\n";
   }
-
-  return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+  
+  // 駒の数をカウント
+  const blackCount = board.flat().filter(c => c === 1).length;
+  const whiteCount = board.flat().filter(c => c === 2).length;
+  
+  description += `\nScore: Black=${blackCount}, White=${whiteCount}\n`;
+  
+  description += `\nYou can place at: ${validMoves.map(m => `(${m.x},${m.y})-flips:${m.flips.length}`).join(", ")}\n`;
+  
+  return description;
 }
 
-app.post("/api/ai-move", (req, res) => {
+app.post("/api/ai-move", async (req, res) => {
   const { board, aiPlayer } = req.body;
   const player = aiPlayer === 1 ? 1 : 2;
 
@@ -109,16 +108,74 @@ app.post("/api/ai-move", (req, res) => {
     return res.status(400).json({ error: "AIが置ける場所がありません" });
   }
 
-  const move = chooseBestMove(validMoves);
+  try {
+    // Gemini APIに盤面を説明して、最適手を判断させる
+    const boardDescription = describeBoardState(board, player, validMoves);
+    
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `
+You are playing Othello (Reversi) as the ${player === 1 ? "Black (1)" : "White (2)"} player.
 
-  res.json({
-    x: move.x,
-    y: move.y,
-    aiPlayer: player,
-    message: "AIが手を決めました"
-  });
+Current board state:
+${boardDescription}
+
+Valid moves available: ${validMoves.map(m => `[${m.x},${m.y}]`).join(", ")}
+
+Analyze the board and choose the BEST move. Consider:
+1. Maximize the number of opponent pieces flipped
+2. Prefer corner positions (0,0), (0,7), (7,0), (7,7)
+3. Avoid edge positions near corners
+4. Strategic positioning
+
+Respond with ONLY the coordinate in format: x,y
+Example: 2,3
+
+Your move:`;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text().trim();
+    
+    // レスポンスからx,yを抽出
+    const match = text.match(/(\d+),(\d+)/);
+    if (!match) {
+      throw new Error("Invalid response format from Gemini");
+    }
+
+    const [, xStr, yStr] = match;
+    const x = parseInt(xStr);
+    const y = parseInt(yStr);
+
+    // 返答が有効か確認
+    if (!validMoves.find(m => m.x === x && m.y === y)) {
+      throw new Error("Gemini returned invalid move");
+    }
+
+    res.json({
+      x,
+      y,
+      aiPlayer: player,
+      message: "Geminiが手を決めました"
+    });
+  } catch (error) {
+    console.error("Gemini API error:", error);
+    // フォールバック：ランダムで置ける場所を選ぶ
+    const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+    res.json({
+      x: randomMove.x,
+      y: randomMove.y,
+      aiPlayer: player,
+      message: "フォールバック: ランダムな手"
+    });
+  }
 });
 
 app.listen(PORT, () => {
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn("⚠️  警告: GEMINI_API_KEY が設定されていません");
+    console.warn("https://aistudio.google.com/app/apikeys でAPIキーを取得してください");
+    console.warn(".env ファイルに以下を追加してください:");
+    console.warn("GEMINI_API_KEY=あなたのキー");
+  }
   console.log(`Server running on http://localhost:${PORT}`);
 });
