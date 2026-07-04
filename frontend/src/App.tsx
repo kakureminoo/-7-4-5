@@ -90,7 +90,7 @@ function App() {
     setScopeItems((items) =>
       items.map((item, itemIndex) =>
         itemIndex === index
-          ? normalizeScopeItem({ ...item, value })
+          ? normalizeScopeItem({ ...item, [field]: value })
           : item
       )
     );
@@ -171,7 +171,7 @@ function App() {
                 focus: 'テスト',
                 detail:
                   '試験日です。直前は新しい範囲を増やしすぎず、確認と復習を中心にします。',
-                type: 'test',
+                type: 'test' as const,
               },
             ].sort((a, b) => a.date.localeCompare(b.date)),
           }

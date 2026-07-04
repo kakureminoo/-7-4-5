@@ -146,7 +146,7 @@ export function PlannerForm(props: PlannerFormProps) {
                       ? '未入力'
                       : undefined
                   }
-                  inputProps={{ min: 1 }}
+                  slotProps={{ htmlInput: { min: 1 } }}
                 />
 
                 <TextField
@@ -162,7 +162,7 @@ export function PlannerForm(props: PlannerFormProps) {
                       ? '未入力'
                       : undefined
                   }
-                  inputProps={{ min: Number(item.startPage || 1) }}
+                  slotProps={{ htmlInput: { min: Number(item.startPage || 1) } }}
                 />
 
                 <Button
@@ -192,7 +192,7 @@ export function PlannerForm(props: PlannerFormProps) {
             type="number"
             value={props.studyHoursPerDay}
             onChange={(e) => props.onStudyHoursChange(e.target.value)}
-            inputProps={{ min: 0.5, step: 0.5 }}
+            slotProps={{ htmlInput: { min: 0.5, step: 0.5 } }}
             fullWidth
           />
 
