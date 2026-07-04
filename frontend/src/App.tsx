@@ -132,12 +132,13 @@ function App() {
   };
 
   const generatePlan = async () => {
-    const isOverThreeMonths = dayjs(examDate).isAfter(dayjs().add(3, 'month'), 'day');
+    const deadlineDate = dayjs(examDate);
+    const isInvalidDeadline = !deadlineDate.isAfter(dayjs(), 'day') || deadlineDate.isAfter(dayjs().add(3, 'month'), 'day');
     const hasBlankScope = scopeItems.some((item) => (
       !item.name.trim() || !item.startPage.trim() || !item.endPage.trim()
     ));
 
-    if (isOverThreeMonths) {
+    if (isInvalidDeadline) {
       setShowDeadlineError(true);
       return;
     }
@@ -220,7 +221,7 @@ function App() {
             Study Planner
           </Typography>
           <Typography variant="h3" component="h1" sx={{ mt: 0.5, fontWeight: 600, fontSize: { xs: 32, md: 44 } }}>
-            テスト勉強特化プランナー
+            テスト勉強プランナー
           </Typography>
           <Typography sx={{ mt: 1.5, maxWidth: 760, color: '#475569', lineHeight: 1.8 }}>
             試験日・範囲・提出課題から、3か月以内で終わる学習スケジュールを作成します。
@@ -248,7 +249,7 @@ function App() {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {showDeadlineError && (
                     <Alert severity="warning" sx={{ borderRadius: 3 }}>
-                      期限は今日から3か月以内の日付を入力してください。
+                      期限は今日より後、かつ3か月以内の日付を入力してください。
                     </Alert>
                   )}
                   <TextField
@@ -354,7 +355,7 @@ function App() {
                   <CalendarMonth sx={{ color: primaryBlue }} />
                   <Box>
                     <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      カレンダー（学習予定）
+                      {subject ? `${subject}勉強計画` : '勉強計画'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       日付ごとの予定を一覧で確認できます。
