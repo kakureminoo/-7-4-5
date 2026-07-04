@@ -16,6 +16,7 @@ dist-ssr
 study-planner.splite
 backend/data/study-planner.sqlite
 
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
