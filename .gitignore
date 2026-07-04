@@ -4,4 +4,5 @@
 
 node_modules/
 dist/
-study-planner.splite
+study-planner.sqlite
+backend/data/study-planner.sqlite
