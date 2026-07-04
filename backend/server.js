@@ -1,181 +1,166 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
+const dayjs = require('dayjs');
+const { OpenAI } = require('openai');
+require('dotenv').config();
 
 const app = express();
-const PORT = 3001;
-const SIZE = 8;
-const DIRECTIONS = [
-  [-1,-1],[0,-1],[1,-1],
-  [-1,0],         [1,0],
-  [-1,1],[0,1],[1,1]
-];
-
-// Gemini API の初期化
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const PORT = process.env.PORT || 3001;
+const DB_PATH = path.join(__dirname, 'data', 'study-planner.sqlite');
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Othello AI API is running");
+const db = new sqlite3.Database(DB_PATH, (err) => {
+  if (err) {
+    console.error('DB connection failed', err.message);
+  } else {
+    console.log('Connected to SQLite database');
+  }
 });
 
-function getFlips(board, x, y, player) {
-  if (board[y][x] !== 0) return [];
-
-  const result = [];
-
-  for (const [dx, dy] of DIRECTIONS) {
-    let nx = x + dx;
-    let ny = y + dy;
-    const temp = [];
-
-    while (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
-      const cell = board[ny][nx];
-      if (cell === 0) {
-        break;
-      }
-      if (cell !== player) {
-        temp.push([nx, ny]);
-      } else {
-        if (temp.length > 0) {
-          result.push(...temp);
-        }
-        break;
-      }
-      nx += dx;
-      ny += dy;
-    }
-  }
-
-  return result;
+function initDb() {
+  db.serialize(() => {
+    db.run(`
+      CREATE TABLE IF NOT EXISTS plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        plan_json TEXT NOT NULL
+      )
+    `);
+  });
 }
 
-function getValidMoves(board, player) {
-  const moves = [];
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      const flips = getFlips(board, x, y, player);
-      if (flips.length > 0) {
-        moves.push({ x, y, flips });
+function createFallbackAnswer(message, plan) {
+  const lower = message.toLowerCase();
+  if (lower.includes('勉強')) {
+    return 'まずは1日の最初に基礎を30分、午後に問題演習を30分、夜に復習を30分に分けると回復しやすいです。';
+  }
+  if (lower.includes('計画')) {
+    return `現在の計画では ${plan.subject} の試験まで ${plan.plan.length} 件の学習タスクを組み込んでいます。優先度の高い項目から順に進めるのが効果的です。`;
+  }
+  return '試験勉強なら、毎日少しずつでも続けることが大切です。まずは今日の予定を1つだけ確実に完了させましょう。';
+}
+
+function buildPlan(payload) {
+  const start = dayjs();
+  const examDate = dayjs(payload.examDate);
+  const deadlineDate = payload.taskDeadline ? dayjs(payload.taskDeadline) : examDate;
+  const totalDays = Math.max(1, Math.min(90, examDate.diff(start, 'day') + 1));
+  const scopeItems = payload.scope
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const studyHours = Number(payload.studyHoursPerDay || 2);
+  const topicCount = Math.max(scopeItems.length, 3);
+  const dailySlots = Math.min(totalDays, Math.max(7, topicCount + 3));
+  const plan = [];
+
+  for (let index = 0; index < dailySlots; index += 1) {
+    const currentDate = start.add(index, 'day').format('YYYY-MM-DD');
+    const topic = scopeItems[index % Math.max(scopeItems.length, 1)] || '総復習';
+    plan.push({
+      date: currentDate,
+      title: `${payload.subject} の学習`,
+      focus: topic,
+      detail: `${studyHours}時間の学習プラン。要点の整理と問題演習をセットで行います。`,
+      type: 'study',
+    });
+  }
+
+  if (payload.taskTitle) {
+    plan.push({
+      date: deadlineDate.format('YYYY-MM-DD'),
+      title: payload.taskTitle,
+      focus: '提出課題',
+      detail: '締切に合わせて仕上げる。必要なら最後に見直しを入れます。',
+      type: 'task',
+    });
+  }
+
+  plan.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    subject: payload.subject,
+    examDate: examDate.format('YYYY-MM-DD'),
+    deadline: deadlineDate.format('YYYY-MM-DD'),
+    plan,
+    summary: `${payload.subject} を ${totalDays} 日で進める学習計画です。${scopeItems.length} つの範囲を分割して、毎日 ${studyHours} 時間学習する形にしています。`,
+  };
+}
+
+app.get('/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
+app.get('/api/plans', (_req, res) => {
+  db.all('SELECT * FROM plans ORDER BY id DESC LIMIT 10', [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+app.post('/api/generate-plan', (req, res) => {
+  const plan = buildPlan(req.body);
+  const createdAt = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  db.run(
+    'INSERT INTO plans (created_at, subject, plan_json) VALUES (?, ?, ?)',
+    [createdAt, plan.subject, JSON.stringify(plan)],
+    (err) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
       }
-    }
-  }
-  return moves;
-}
+      res.json({ ok: true, plan });
+    },
+  );
+});
 
-function describeBoardState(board, player, validMoves) {
-  const playerName = player === 1 ? "Black (1)" : "White (2)";
-  const opponentName = player === 1 ? "White (2)" : "Black (1)";
-  
-  let description = `Player: ${playerName}\n\nBoard (8x8):\n`;
-  
-  // ボード表示
-  for (let y = 0; y < SIZE; y++) {
-    let row = "";
-    for (let x = 0; x < SIZE; x++) {
-      if (board[y][x] === 0) row += ". ";
-      else if (board[y][x] === 1) row += "B ";
-      else row += "W ";
-    }
-    description += row + "\n";
-  }
-  
-  // 駒の数をカウント
-  const blackCount = board.flat().filter(c => c === 1).length;
-  const whiteCount = board.flat().filter(c => c === 2).length;
-  
-  description += `\nScore: Black=${blackCount}, White=${whiteCount}\n`;
-  
-  description += `\nYou can place at: ${validMoves.map(m => `(${m.x},${m.y})-flips:${m.flips.length}`).join(", ")}\n`;
-  
-  return description;
-}
-
-app.post("/api/ai-move", async (req, res) => {
-  const { board, aiPlayer } = req.body;
-  const player = aiPlayer === 1 ? 1 : 2;
-
-  if (!Array.isArray(board) || board.length !== SIZE) {
-    return res.status(400).json({ error: "不正な盤面データです" });
+app.post('/api/chat', async (req, res) => {
+  const { message, plan } = req.body;
+  if (!message) {
+    res.status(400).json({ error: 'message is required' });
+    return;
   }
 
-  const validMoves = getValidMoves(board, player);
-
-  if (validMoves.length === 0) {
-    return res.status(400).json({ error: "AIが置ける場所がありません" });
+  if (!process.env.OPENAI_API_KEY) {
+    res.json({ answer: createFallbackAnswer(message, plan) });
+    return;
   }
 
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
-    // Gemini APIに盤面を説明して、最適手を判断させる
-    const boardDescription = describeBoardState(board, player, validMoves);
-    
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `
-You are playing Othello (Reversi) as the ${player === 1 ? "Black (1)" : "White (2)"} player.
-
-Current board state:
-${boardDescription}
-
-Valid moves available: ${validMoves.map(m => `[${m.x},${m.y}]`).join(", ")}
-
-Analyze the board and choose the BEST move. Consider:
-1. Maximize the number of opponent pieces flipped
-2. Prefer corner positions (0,0), (0,7), (7,0), (7,7)
-3. Avoid edge positions near corners
-4. Strategic positioning
-
-Respond with ONLY the coordinate in format: x,y
-Example: 2,3
-
-Your move:`;
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text().trim();
-    
-    // レスポンスからx,yを抽出
-    const match = text.match(/(\d+),(\d+)/);
-    if (!match) {
-      throw new Error("Invalid response format from Gemini");
-    }
-
-    const [, xStr, yStr] = match;
-    const x = parseInt(xStr);
-    const y = parseInt(yStr);
-
-    // 返答が有効か確認
-    if (!validMoves.find(m => m.x === x && m.y === y)) {
-      throw new Error("Gemini returned invalid move");
-    }
-
-    res.json({
-      x,
-      y,
-      aiPlayer: player,
-      message: "Geminiが手を決めました"
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'あなたは試験勉強を支援するAIです。短く具体的に、勉強計画に沿って助言してください。',
+        },
+        {
+          role: 'user',
+          content: `質問: ${message}\n\n現在の学習計画: ${JSON.stringify(plan)}`,
+        },
+      ],
+      temperature: 0.7,
     });
+
+    const answer = completion.choices[0]?.message?.content || '回答が取得できませんでした。';
+    res.json({ answer });
   } catch (error) {
-    console.error("Gemini API error:", error);
-    // フォールバック：ランダムで置ける場所を選ぶ
-    const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
-    res.json({
-      x: randomMove.x,
-      y: randomMove.y,
-      aiPlayer: player,
-      message: "フォールバック: ランダムな手"
-    });
+    res.json({ answer: createFallbackAnswer(message, plan) });
   }
 });
+
+initDb();
 
 app.listen(PORT, () => {
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn("⚠️  警告: GEMINI_API_KEY が設定されていません");
-    console.warn("https://aistudio.google.com/app/apikeys でAPIキーを取得してください");
-    console.warn(".env ファイルに以下を追加してください:");
-    console.warn("GEMINI_API_KEY=あなたのキー");
-  }
   console.log(`Server running on http://localhost:${PORT}`);
 });
