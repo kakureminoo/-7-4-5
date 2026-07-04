@@ -7,3 +7,6 @@ dist/
 study-planner.sqlite
 backend/data/study-planner.sqlite
 backend/data/study-planner.sqlite
+
+node_modules
+backend/data/*.sqlite
