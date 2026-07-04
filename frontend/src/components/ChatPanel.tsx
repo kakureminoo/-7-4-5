@@ -1,33 +1,84 @@
-import { Box, Button, Card, CardContent, Paper, TextField, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Paper,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { School } from '@mui/icons-material';
+
+const primaryBlue = '#3b82f6';
 
 interface ChatPanelProps {
   chatInput: string;
   answer: string;
-  loading: boolean;
   disabled: boolean;
   onChatInputChange: (value: string) => void;
   onAsk: () => void;
 }
 
-export function ChatPanel({ chatInput, answer, loading, disabled, onChatInputChange, onAsk }: ChatPanelProps) {
+export function ChatPanel({
+  chatInput,
+  answer,
+  disabled,
+  onChatInputChange,
+  onAsk,
+}: ChatPanelProps) {
   return (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <School color="primary" />
-          <Typography variant="h6">AIチャット</Typography>
+    <>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
+        <School sx={{ color: primaryBlue }} />
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            AIチャット
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            学習計画をもとに、今日の進め方や優先順位を相談できます。
+          </Typography>
         </Box>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField label="質問する" value={chatInput} onChange={(e) => onChatInputChange(e.target.value)} fullWidth />
-          <Button variant="outlined" onClick={onAsk} disabled={disabled || loading}>
-            {loading ? '考え中...' : '質問する'}
-          </Button>
-          <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8f9fa' }}>
-            <Typography variant="body1">{answer}</Typography>
-          </Paper>
-        </Box>
-      </CardContent>
-    </Card>
+      </Box>
+
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: 1.5,
+        }}
+      >
+        <TextField
+          label="質問する"
+          value={chatInput}
+          onChange={(e) => onChatInputChange(e.target.value)}
+          placeholder={disabled ? '計画を作成するとAIに質問できます' : undefined}
+          disabled={disabled}
+          fullWidth
+        />
+
+        <Button
+          variant="outlined"
+          onClick={onAsk}
+          disabled={disabled}
+          sx={{
+            px: 4,
+            borderRadius: 3,
+            fontWeight: 600,
+          }}
+        >
+          質問する
+        </Button>
+      </Box>
+
+      <Paper
+        variant="outlined"
+        sx={{
+          mt: 2,
+          p: 2,
+          borderRadius: 3,
+          bgcolor: '#f8fafc',
+        }}
+      >
+        <Typography variant="body1">{answer}</Typography>
+      </Paper>
+    </>
   );
 }
