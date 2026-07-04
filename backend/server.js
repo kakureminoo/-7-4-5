@@ -159,8 +159,146 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+app.post('/api/excuse-breaker', async (req, res) => {
+  const { task, obstacles } = req.body;
+
+  if (!task || !obstacles) {
+    res.status(400).json({ error: 'task and obstacles are required' });
+    return;
+  }
+
+  console.log('--- /api/excuse-breaker called ---');
+  console.log('task:', task);
+  console.log('has api key:', !!process.env.OPENAI_API_KEY);
+
+  if (!process.env.OPENAI_API_KEY) {
+    res.json({
+      source: 'fallback',
+      result: createFallbackExcuseBreaker(task, obstacles),
+    });
+    return;
+  }
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'あなたは学習を支援するコーチです。ユーザーの言いわけや障害を責めずに受け止め、現実的で短い行動提案に変換してください。精神論ではなく、今すぐできる小さな一歩を提案してください。',
+        },
+        {
+          role: 'user',
+          content: `
+やること:
+${task}
+
+障害:
+${obstacles}
+
+出力形式:
+以下のJSON形式だけで返してください。
+
+{
+  "task": "やること",
+  "summary": "短いまとめ",
+  "responses": [
+    {
+      "obstacle": "障害",
+      "reply": "その障害を乗り越えるための短い提案"
+    }
+  ]
+}
+`,
+        },
+      ],
+      temperature: 0.7,
+    });
+
+    const text = completion.choices[0]?.message?.content || '';
+
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (_parseError) {
+      result = createFallbackExcuseBreaker(task, obstacles);
+    }
+
+    res.json({
+      source: 'openai',
+      result,
+    });
+  } catch (error) {
+    console.error('OpenAI excuse-breaker error:', error.message);
+
+    res.json({
+      source: 'fallback',
+      reason: error.message,
+      result: createFallbackExcuseBreaker(task, obstacles),
+    });
+  }
+});
+
 initDb();
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+function createFallbackExcuseBreaker(task, obstacles) {
+  const lines = obstacles
+    .split(/\n+/)
+    .map((line) => line.replace(/^・/, '').trim())
+    .filter(Boolean);
+
+  const responses = lines.map((obstacle) => {
+    if (obstacle.includes('やる気')) {
+      return {
+        obstacle,
+        reply: 'まずは1分だけ始めてみましょう。やる気は始めた後に出ることが多いです。',
+      };
+    }
+
+    if (obstacle.includes('今日') || obstacle.includes('明日')) {
+      return {
+        obstacle,
+        reply: '今日やらなくても大丈夫かもしれませんが、1分だけでも進めると明日の自分が確実に楽になります。',
+      };
+    }
+
+    if (obstacle.includes('理解') || obstacle.includes('わからない') || obstacle.includes('難しい')) {
+      return {
+        obstacle,
+        reply: '完璧に理解しようとせず、まず一度範囲を一周してみましょう。わからない場所を見つけるだけでも前進です。',
+      };
+    }
+
+    if (obstacle.includes('他') || obstacle.includes('忙しい')) {
+      return {
+        obstacle,
+        reply: `そのことと「${task}」の優先順位を比べて、今どちらに取り組むべきか決めましょう。`,
+      };
+    }
+
+    if (obstacle.includes('予定')) {
+      return {
+        obstacle,
+        reply: '予定の前、または終わった後に5〜10分だけ取り組める時間がないか考えてみましょう。',
+      };
+    }
+
+    return {
+      obstacle,
+      reply: `「${task}」を全部やろうとせず、まず最初の1ステップだけに分解して始めてみましょう。`,
+    };
+  });
+
+  return {
+    task,
+    responses,
+    summary: `「${task}」に対する障害を、今すぐできる小さな行動に変換しました。`,
+  };
+}

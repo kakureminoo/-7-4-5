@@ -42,6 +42,12 @@ interface ScopeItem {
 const API_BASE = 'http://localhost:3001';
 
 function App() {
+  const [excuseTask, setExcuseTask] = useState('テスト勉強');
+  const [obstacles, setObstacles] = useState(
+    'やる気が湧かない\n今日始めなくても問題ない\n内容理解ができず続かない\n他にやることがある\n予定が入ってしまっている'
+  ); 
+  const [excuseResult, setExcuseResult] = useState<any | null>(null);
+  const [excuseLoading, setExcuseLoading] = useState(false);
   const [subject, setSubject] = useState('英語');
   const [examDate, setExamDate] = useState(dayjs().add(30, 'day').format('YYYY-MM-DD'));
   const [taskTitle, setTaskTitle] = useState("テスト");
@@ -139,7 +145,23 @@ function App() {
       console.error(error);
     }
   };
+  const breakExcuses = async () => {
+  setExcuseLoading(true);
 
+  try {
+    const res = await axios.post(`${API_BASE}/api/excuse-breaker`, {
+      task: excuseTask,
+      obstacles,
+    });
+
+    console.log('excuse breaker response:', res.data);
+      setExcuseResult(res.data.result);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setExcuseLoading(false);
+    }
+  };
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -228,7 +250,7 @@ function App() {
             </Card>
           </Box>
         </Box>
-
+        
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
           <Box sx={{ flex: 1 }}>
             <Card>
@@ -268,6 +290,76 @@ function App() {
           </Box>
         </Box>
       </Box>
+      <Card>
+  <CardContent>
+    <Typography variant="h6" gutterBottom>
+      言いわけブレイカー
+    </Typography>
+
+    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      やることに対して、めんどくさい理由や障害を書いてください。
+      AIがそれを小さな行動に変換します。
+    </Typography>
+
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <TextField
+        label="やること"
+        value={excuseTask}
+        onChange={(e) => setExcuseTask(e.target.value)}
+        fullWidth
+      />
+
+      <TextField
+        label="障害・言いわけ"
+        value={obstacles}
+        onChange={(e) => setObstacles(e.target.value)}
+        multiline
+        minRows={5}
+        fullWidth
+        helperText="1行に1つずつ入力してください"
+      />
+
+      <Button
+        variant="contained"
+        color="secondary"
+        onClick={breakExcuses}
+        disabled={excuseLoading}
+      >
+        {excuseLoading ? '変換中...' : '言いわけを行動に変える'}
+      </Button>
+
+      {excuseResult && (
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8f9fa' }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+            {excuseResult.summary}
+          </Typography>
+
+          <List>
+            {excuseResult.responses.map((item: any, index: number) => (
+              <ListItem
+                key={`${item.obstacle}-${index}`}
+                sx={{
+                  display: 'block',
+                  bgcolor: '#ffffff',
+                  borderRadius: 2,
+                  mb: 1,
+                  border: '1px solid #eee',
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  障害：{item.obstacle}
+                </Typography>
+                <Typography variant="body1" sx={{ mt: 0.5 }}>
+                  → {item.reply}
+                </Typography>
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+      )}
+    </Box>
+  </CardContent>
+</Card>
     </Container>
   );
 }
