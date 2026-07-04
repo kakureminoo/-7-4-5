@@ -390,20 +390,9 @@ function App() {
                               >
                                 <ListItemText
                                   primary={
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                      <Typography sx={{ fontWeight: 600 }}>
-                                        {item.type === 'test' ? item.title : item.focus}
-                                      </Typography>
-                                      <Chip
-                                        size="small"
-                                        label={item.type === 'test' ? 'テスト' : '学習'}
-                                        sx={{
-                                          bgcolor: colors.chipBg,
-                                          color: colors.chipText,
-                                          fontWeight: 600,
-                                        }}
-                                      />
-                                    </Box>
+                                    <Typography sx={{ color: colors.chipText, fontWeight: 600 }}>
+                                      {item.type === 'test' ? item.title : item.focus}
+                                    </Typography>
                                   }
                                   secondary={item.detail}
                                 />
