@@ -13,6 +13,7 @@ dist-ssr
 *.local
 
 .env
+study-planner.splite
 
 # Editor directories and files
 .vscode/*
