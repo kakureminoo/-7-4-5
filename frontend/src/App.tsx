@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { CalendarMonth, School, TaskAlt } from '@mui/icons-material';
+import { Add, CalendarMonth, Delete, School, TaskAlt } from '@mui/icons-material';
 
 interface PlanItem {
   date: string;
@@ -33,14 +33,24 @@ interface StudyPlan {
   plan: PlanItem[];
 }
 
+interface ScopeItem {
+  name: string;
+  startPage: string;
+  endPage: string;
+}
+
 const API_BASE = 'http://localhost:3001';
 
 function App() {
   const [subject, setSubject] = useState('英語');
   const [examDate, setExamDate] = useState(dayjs().add(30, 'day').format('YYYY-MM-DD'));
-  const [scope, setScope] = useState('単語\n文法\n長文');
-  const [taskTitle, setTaskTitle] = useState('レポート提出');
-  const [taskDeadline, setTaskDeadline] = useState(dayjs().add(25, 'day').format('YYYY-MM-DD'));
+  const [taskTitle, setTaskTitle] = useState("テスト");
+  const [scopeItems, setScopeItems] = useState<ScopeItem[]>([
+    { name: '単語', startPage: '1', endPage: '50' },
+    { name: '文法', startPage: '1', endPage: '30' },
+    { name: '長文', startPage: '1', endPage: '20' },
+  ]);
+  /*const [taskDeadline, setTaskDeadline] = useState(dayjs().add(25, 'day').format('YYYY-MM-DD')); */
   const [studyHoursPerDay, setStudyHoursPerDay] = useState('2');
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [chatInput, setChatInput] = useState('今日の勉強の進め方を教えて');
@@ -58,15 +68,55 @@ function App() {
     return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
   }, [plan]);
 
+  const updateScopeItem = (index: number, field: keyof ScopeItem, value: string) => {
+    setScopeItems((items) => items.map((item, itemIndex) => (
+      itemIndex === index ? normalizeScopeItem({ ...item, [field]: value }) : item
+    )));
+  };
+
+  const normalizeScopeItem = (item: ScopeItem) => {
+    const startPage = Number(item.startPage);
+    const endPage = Number(item.endPage);
+
+    if (!Number.isFinite(startPage) || !Number.isFinite(endPage) || !item.startPage || !item.endPage) {
+      return item;
+    }
+
+    if (startPage <= endPage) {
+      return item;
+    }
+
+    return {
+      ...item,
+      endPage: String(startPage),
+    };
+  };
+
+  const addScopeItem = () => {
+    setScopeItems((items) => [...items, { name: '', startPage: '', endPage: '' }]);
+  };
+
+  const removeScopeItem = (index: number) => {
+    setScopeItems((items) => items.filter((_, itemIndex) => itemIndex !== index));
+  };
+
   const generatePlan = async () => {
     setLoading(true);
     try {
+      const scope = scopeItems
+        .map((item) => {
+          const pageRange = item.startPage || item.endPage ? ` p.${item.startPage || '?'}-${item.endPage || '?'}` : '';
+          return `${item.name}${pageRange}`.trim();
+        })
+        .filter(Boolean)
+        .join('\n');
+
       const res = await axios.post(`${API_BASE}/api/generate-plan`, {
         subject,
         examDate,
         scope,
         taskTitle,
-        taskDeadline,
+        /*taskDeadline,*/
         studyHoursPerDay,
       });
       setPlan(res.data.plan);
@@ -110,11 +160,26 @@ function App() {
                   入力フォーム
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField label="テスト名" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} fullWidth />
                   <TextField label="科目" value={subject} onChange={(e) => setSubject(e.target.value)} fullWidth />
-                  <TextField label="試験日" type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} />
-                  <TextField label="試験範囲" multiline minRows={3} value={scope} onChange={(e) => setScope(e.target.value)} />
-                  <TextField label="提出課題" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} fullWidth />
-                  <TextField label="課題締切" type="date" value={taskDeadline} onChange={(e) => setTaskDeadline(e.target.value)} />
+                  <TextField label="いつまでに終わるか" type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} />
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Typography variant="subtitle2">範囲</Typography>
+                    {scopeItems.map((item, index) => (
+                      <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <TextField label="参考書・章・分野" value={item.name} onChange={(e) => updateScopeItem(index, 'name', e.target.value)} fullWidth />
+                        <TextField label="開始p" type="number" value={item.startPage} onChange={(e) => updateScopeItem(index, 'startPage', e.target.value)} slotProps={{ htmlInput: { min: 1 } }} sx={{ width: 96 }} />
+                        <TextField label="終了p" type="number" value={item.endPage} onChange={(e) => updateScopeItem(index, 'endPage', e.target.value)} slotProps={{ htmlInput: { min: Number(item.startPage || 1) } }} sx={{ width: 96 }} />
+                        <Button variant="outlined" color="error" onClick={() => removeScopeItem(index)} disabled={scopeItems.length === 1} sx={{ minWidth: 48 }}>
+                          <Delete fontSize="small" />
+                        </Button>
+                      </Box>
+                    ))}
+                    <Button variant="outlined" onClick={addScopeItem} startIcon={<Add />}>
+                      範囲を追加
+                    </Button>
+                  </Box>
+                  {/* <TextField label="課題締切" type="date" value={taskDeadline} onChange={(e) => setTaskDeadline(e.target.value)} /> */}
                   <TextField label="1日あたりの学習時間（時間）" type="number" value={studyHoursPerDay} onChange={(e) => setStudyHoursPerDay(e.target.value)} />
                   <Button variant="contained" onClick={generatePlan} disabled={loading}>
                     {loading ? '生成中...' : '学習スケジュールを作成'}
