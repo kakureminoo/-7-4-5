@@ -16,7 +16,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Add, CalendarMonth, Delete, School } from '@mui/icons-material';
+import { Add, CalendarMonth, Delete, School, TaskAlt } from '@mui/icons-material';
 
 interface PlanItem {
   date: string;
@@ -57,6 +57,12 @@ const focusColorPalette = [
 const overflowFocusColor = { bg: '#f8fafc', border: '#cbd5e1', chipBg: '#e2e8f0', chipText: '#334155' };
 
 function App() {
+  const [excuseTask, setExcuseTask] = useState('テスト勉強');
+  const [obstacles, setObstacles] = useState(
+    'やる気が湧かない\n今日始めなくても問題ない\n内容理解ができず続かない\n他にやることがある\n予定が入ってしまっている'
+  );
+  const [excuseResult, setExcuseResult] = useState<any | null>(null);
+  const [excuseLoading, setExcuseLoading] = useState(false);
   const [subject, setSubject] = useState('英語');
   const [examDate, setExamDate] = useState(dayjs().add(30, 'day').format('YYYY-MM-DD'));
   const [testTitle, setTestTitle] = useState('テスト');
@@ -169,18 +175,18 @@ function App() {
       const generatedPlan = res.data.plan as StudyPlan;
       const planWithTest = testTitle.trim()
         ? {
-            ...generatedPlan,
-            plan: [
-              ...generatedPlan.plan,
-              {
-                date: examDate,
-                title: testTitle,
-                focus: 'テスト',
-                detail: '試験日です。直前は新しい範囲を増やしすぎず、確認と復習を中心にします。',
-                type: 'test' as const,
-              },
-            ].sort((a, b) => a.date.localeCompare(b.date)),
-          }
+          ...generatedPlan,
+          plan: [
+            ...generatedPlan.plan,
+            {
+              date: examDate,
+              title: testTitle,
+              focus: 'テスト',
+              detail: '試験日です。直前は新しい範囲を増やしすぎず、確認と復習を中心にします。',
+              type: 'test' as const,
+            },
+          ].sort((a, b) => a.date.localeCompare(b.date)),
+        }
         : generatedPlan;
       setPlan(planWithTest);
     } catch (error) {
@@ -202,7 +208,23 @@ function App() {
       console.error(error);
     }
   };
+  const breakExcuses = async () => {
+    setExcuseLoading(true);
 
+    try {
+      const res = await axios.post(`${API_BASE}/api/excuse-breaker`, {
+        task: excuseTask,
+        obstacles,
+      });
+
+      console.log('excuse breaker response:', res.data);
+      setExcuseResult(res.data.result);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setExcuseLoading(false);
+    }
+  };
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f7fbff' }}>
       <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 } }}>
@@ -433,35 +455,112 @@ function App() {
           </Card>
         </Box>
 
-        <Card elevation={0} sx={{ mt: 3, borderRadius: 4, border: '1px solid #e2e8f0' }}>
-          <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
-              <School sx={{ color: primaryBlue }} />
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  AIチャット
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  学習計画をもとに、今日の進め方や優先順位を相談できます。
-                </Typography>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+          <Box sx={{ flex: 1 }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <School color="primary" />
+                  <Typography variant="h6">AIチャット</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField label="質問する" value={chatInput} onChange={(e) => setChatInput(e.target.value)} fullWidth />
+                  <Button variant="outlined" onClick={askAi} disabled={!plan}>
+                    質問する
+                  </Button>
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8f9fa' }}>
+                    <Typography variant="body1">{answer}</Typography>
+                  </Paper>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+
+          <Box sx={{ flex: 1 }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <TaskAlt color="primary" />
+                  <Typography variant="h6">今すぐやること</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Chip label="試験日を設定" />
+                  <Chip label="範囲を入力" />
+                  <Chip label="課題締切を入れる" />
+                  <Chip label="AIに相談" />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              言いわけブレイカー
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              やることに対して、めんどくさい理由や障害を書いてください。
+              AIがそれを小さな行動に変換します。
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TextField
-                label="質問する"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder={plan ? undefined : '計画を作成するとAIに質問できます'}
-                disabled={!plan}
+                label="やること"
+                value={excuseTask}
+                onChange={(e) => setExcuseTask(e.target.value)}
                 fullWidth
               />
-              <Button variant="outlined" onClick={askAi} disabled={!plan} sx={{ px: 4, borderRadius: 3, fontWeight: 600 }}>
-                質問する
+
+              <TextField
+                label="障害・言いわけ"
+                value={obstacles}
+                onChange={(e) => setObstacles(e.target.value)}
+                multiline
+                minRows={5}
+                fullWidth
+                helperText="1行に1つずつ入力してください"
+              />
+
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={breakExcuses}
+                disabled={excuseLoading}
+              >
+                {excuseLoading ? '変換中...' : '言いわけを行動に変える'}
               </Button>
+
+              {excuseResult && (
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8f9fa' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                    {excuseResult.summary}
+                  </Typography>
+
+                  <List>
+                    {excuseResult.responses.map((item: any, index: number) => (
+                      <ListItem
+                        key={`${item.obstacle}-${index}`}
+                        sx={{
+                          display: 'block',
+                          bgcolor: '#ffffff',
+                          borderRadius: 2,
+                          mb: 1,
+                          border: '1px solid #eee',
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          障害：{item.obstacle}
+                        </Typography>
+                        <Typography variant="body1" sx={{ mt: 0.5 }}>
+                          → {item.reply}
+                        </Typography>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              )}
             </Box>
-            <Paper variant="outlined" sx={{ mt: 2, p: 2, borderRadius: 3, bgcolor: '#f8fafc' }}>
-              <Typography variant="body1">{answer}</Typography>
-            </Paper>
           </CardContent>
         </Card>
       </Container>
