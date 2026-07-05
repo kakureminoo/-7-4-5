@@ -1,6 +1,5 @@
 import { Paper, Typography } from '@mui/material';
 
-const primaryBlue = '#3b82f6';
 const borderColor = '#dbeafe';
 
 export function PlannerHeader() {
@@ -16,13 +15,6 @@ export function PlannerHeader() {
         border: `1px solid ${borderColor}`,
       }}
     >
-      <Typography
-        variant="overline"
-        sx={{ color: primaryBlue, fontWeight: 600, letterSpacing: 1 }}
-      >
-        Study Planner
-      </Typography>
-
       <Typography
         variant="h3"
         component="h1"
