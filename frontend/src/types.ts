@@ -15,6 +15,13 @@ export interface StudyPlan {
   plan: PlanItem[];
 }
 
+export interface SavedPlan {
+  id: string | number;
+  subject: string;
+  plan_json: StudyPlan;
+  created_at: string;
+}
+
 export interface ScopeItem {
   name: string;
   startPage: string;

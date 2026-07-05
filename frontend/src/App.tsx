@@ -8,11 +8,12 @@ import {
   Container,
 } from '@mui/material';
 
-import type { PlanItem, ScopeItem, StudyPlan } from './types';
+import type { PlanItem, SavedPlan, ScopeItem, StudyPlan } from './types';
 import { PlannerHeader } from './components/PlannerHeader';
 import { PlannerForm } from './components/PlannerForm';
 import { PlanPreview } from './components/PlanPreview';
 import { ChatPanel } from './components/ChatPanel';
+import { PlanHistory } from './components/PlanHistory';
 
 const API_BASE = 'http://localhost:3001';
 const SAVED_PLAN_KEY = 'study-planner:saved-plan';
@@ -52,6 +53,9 @@ function App() {
 
   const [loading, setLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
   const [showScopeError, setShowScopeError] = useState(false);
   const [showDeadlineError, setShowDeadlineError] = useState(false);
 
@@ -71,6 +75,45 @@ function App() {
       items,
     }));
   }, [plan]);
+
+  const fetchSavedPlans = async () => {
+    try {
+      setHistoryLoading(true);
+      setHistoryError('');
+
+      const res = await axios.get<SavedPlan[]>(`${API_BASE}/api/plans`);
+      setSavedPlans(res.data);
+    } catch (error) {
+      console.error(error);
+      setHistoryError('保存済み計画の読み込みに失敗しました。Supabase設定とbackendの起動を確認してください。');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    axios
+      .get<SavedPlan[]>(`${API_BASE}/api/plans`)
+      .then((res) => {
+        if (!active) return;
+        setSavedPlans(res.data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error(error);
+        setHistoryError('保存済み計画の読み込みに失敗しました。Supabase設定とbackendの起動を確認してください。');
+      })
+      .finally(() => {
+        if (!active) return;
+        setHistoryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!plan) {
@@ -204,11 +247,29 @@ function App() {
         : generatedPlan;
 
       setPlan(planWithTest);
+
+      try {
+        await axios.post(`${API_BASE}/api/plans`, {
+          plan: planWithTest,
+        });
+        await fetchSavedPlans();
+      } catch (saveError) {
+        console.error(saveError);
+        setHistoryError('計画の表示はできていますが、Supabaseへの保存に失敗しました。');
+      }
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const openSavedPlan = (savedPlan: SavedPlan) => {
+    setPlan(savedPlan.plan_json);
+    setSubject(savedPlan.plan_json.subject);
+    setExamDate(savedPlan.plan_json.examDate);
+    setAnswer('保存済みの計画を開きました。この計画についてAIに質問できます。');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const askAi = async () => {
@@ -272,6 +333,14 @@ function App() {
             groupedPlan={groupedPlan}
           />
         </Box>
+
+        <PlanHistory
+          plans={savedPlans}
+          loading={historyLoading}
+          error={historyError}
+          onRefresh={fetchSavedPlans}
+          onSelectPlan={openSavedPlan}
+        />
 
         <Card
           elevation={0}

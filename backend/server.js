@@ -249,7 +249,7 @@ app.get('/api/plans', async (_req, res) => {
   try {
     const { data, error } = await supabase
       .from('plans')
-      .select('*')
+      .select('id, subject, plan_json, created_at')
       .order('created_at', { ascending: false })
       .limit(10);
 
@@ -267,6 +267,20 @@ app.post('/api/generate-plan', async (req, res) => {
   try {
     const plan = await buildPlanWithAI(req.body);
 
+    res.json({ ok: true, plan });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/plans', async (req, res) => {
+  try {
+    const { plan } = req.body;
+
+    if (!plan?.subject || !Array.isArray(plan.plan)) {
+      return res.status(400).json({ error: 'valid plan is required' });
+    }
+
     const { error } = await supabase
       .from('plans')
       .insert([
@@ -280,7 +294,7 @@ app.post('/api/generate-plan', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    res.json({ ok: true, plan });
+    res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
