@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Checkbox,
@@ -9,7 +10,7 @@ import {
   ListItem,
   Typography,
 } from '@mui/material';
-import { CalendarMonth } from '@mui/icons-material';
+import { CalendarMonth, Download } from '@mui/icons-material';
 
 import type { PlanItem, StudyPlan } from '../types';
 
@@ -36,6 +37,7 @@ const testColor = {
   border: '#fecaca',
   chipText: '#991b1b',
 };
+const CHECKED_TASKS_KEY = 'study-planner:checked-tasks';
 
 interface PlanPreviewProps {
   subject: string;
@@ -52,8 +54,196 @@ function createDetailRows(details?: string[]) {
   }));
 }
 
+function readCheckedTasks() {
+  try {
+    const savedTasks = localStorage.getItem(CHECKED_TASKS_KEY);
+
+    return new Set(savedTasks ? (JSON.parse(savedTasks) as string[]) : []);
+  } catch (error) {
+    console.error('チェック状態の読み込みに失敗しました。', error);
+    localStorage.removeItem(CHECKED_TASKS_KEY);
+
+    return new Set<string>();
+  }
+}
+
+function wrapText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+) {
+  const lines: string[] = [];
+  let line = '';
+
+  text.split('').forEach((char) => {
+    const nextLine = `${line}${char}`;
+
+    if (line && context.measureText(nextLine).width > maxWidth) {
+      lines.push(line);
+      line = char;
+      return;
+    }
+
+    line = nextLine;
+  });
+
+  if (line) {
+    lines.push(line);
+  }
+
+  return lines;
+}
+
+function drawRoundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  context.beginPath();
+  context.roundRect(x, y, width, height, radius);
+}
+
+function downloadPlanImage(
+  plan: StudyPlan,
+  groupedPlan: Array<{ date: string; items: PlanItem[] }>
+) {
+  const scale = window.devicePixelRatio || 1;
+  const width = 1080;
+  const padding = 56;
+  const contentWidth = width - padding * 2;
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+
+  if (!context) return;
+
+  context.font =
+    '24px "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
+
+  const itemHeights = groupedPlan.flatMap((entry) =>
+    entry.items.map((item) => {
+      const detailRows = createDetailRows(item.details);
+      const detailTexts = detailRows.length
+        ? detailRows.map(
+            (row) => `□ ${row.todo}${row.advice ? `  ${row.advice}` : ''}`
+          )
+        : [item.detail];
+
+      const lineCount = detailTexts.reduce(
+        (count, text) => count + wrapText(context, text, contentWidth - 52).length,
+        0
+      );
+
+      return 88 + lineCount * 34;
+    })
+  );
+  const summaryLines = wrapText(context, plan.summary, contentWidth);
+  const height =
+    190 +
+    summaryLines.length * 34 +
+    groupedPlan.length * 58 +
+    itemHeights.reduce((total, itemHeight) => total + itemHeight, 0);
+
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  context.scale(scale, scale);
+
+  context.fillStyle = '#f7fbff';
+  context.fillRect(0, 0, width, height);
+
+  context.fillStyle = '#0f172a';
+  context.font =
+    '700 42px "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
+  context.fillText(`${plan.subject}勉強計画`, padding, 72);
+
+  context.fillStyle = '#475569';
+  context.font =
+    '24px "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
+  summaryLines.forEach((line, index) => {
+    context.fillText(line, padding, 118 + index * 34);
+  });
+
+  const metaY = 126 + summaryLines.length * 34;
+  context.fillStyle = '#2563eb';
+  context.font =
+    '600 22px "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
+  context.fillText(`期限: ${dayjs(plan.examDate).format('YYYY/MM/DD')}`, padding, metaY);
+
+  let y = metaY + 50;
+
+  groupedPlan.forEach((entry) => {
+    context.fillStyle = '#334155';
+    context.font =
+      '700 26px "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
+    context.fillText(dayjs(entry.date).format('MM/DD (ddd)'), padding, y);
+    y += 22;
+
+    entry.items.forEach((item) => {
+      const isTestDate = entry.date === plan.examDate;
+      const colors = isTestDate
+        ? testColor
+        : focusColorPalette[
+            Math.abs(item.focus.length + item.title.length) % focusColorPalette.length
+          ] ?? overflowFocusColor;
+      const detailRows = createDetailRows(item.details);
+      const detailTexts = detailRows.length
+        ? detailRows.map(
+            (row) => `□ ${row.todo}${row.advice ? `  ${row.advice}` : ''}`
+          )
+        : [item.detail];
+      const detailLines = detailTexts.flatMap((text) =>
+        wrapText(context, text, contentWidth - 52)
+      );
+      const cardHeight = 88 + detailLines.length * 34;
+
+      drawRoundedRect(context, padding, y, contentWidth, cardHeight, 16);
+      context.fillStyle = colors.bg;
+      context.fill();
+      context.strokeStyle = colors.border;
+      context.lineWidth = 2;
+      context.stroke();
+
+      context.fillStyle = colors.chipText;
+      context.font =
+        '700 25px "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
+      context.fillText(
+        item.type === 'test' ? item.title : item.focus,
+        padding + 26,
+        y + 42
+      );
+
+      context.fillStyle = '#475569';
+      context.font =
+        '24px "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
+      detailLines.forEach((line, index) => {
+        context.fillText(line, padding + 26, y + 82 + index * 34);
+      });
+
+      y += cardHeight + 14;
+    });
+
+    y += 24;
+  });
+
+  const safeSubject = plan.subject.replace(/[\\/:*?"<>|]/g, '_') || 'study-plan';
+  const link = document.createElement('a');
+  link.download = `${safeSubject}-study-plan.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
 export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
-  const [checkedTasks, setCheckedTasks] = useState<Set<string>>(() => new Set());
+  const [checkedTasks, setCheckedTasks] = useState<Set<string>>(() =>
+    readCheckedTasks()
+  );
+
+  useEffect(() => {
+    localStorage.setItem(CHECKED_TASKS_KEY, JSON.stringify([...checkedTasks]));
+  }, [checkedTasks]);
 
   const toggleTask = (taskKey: string) => {
     setCheckedTasks((current) => {
@@ -99,9 +289,10 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: { xs: 'flex-start', sm: 'center' },
             justifyContent: 'space-between',
             gap: 2,
+            flexWrap: 'wrap',
             mb: 2.5,
           }}
         >
@@ -117,6 +308,16 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
             </Box>
           </Box>
 
+          {plan && (
+            <Button
+              variant="outlined"
+              startIcon={<Download />}
+              onClick={() => downloadPlanImage(plan, groupedPlan)}
+              sx={{ borderRadius: 3, whiteSpace: 'nowrap' }}
+            >
+              画像保存
+            </Button>
+          )}
         </Box>
 
         {plan ? (

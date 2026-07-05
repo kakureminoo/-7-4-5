@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import {
@@ -15,11 +15,26 @@ import { PlanPreview } from './components/PlanPreview';
 import { ChatPanel } from './components/ChatPanel';
 
 const API_BASE = 'http://localhost:3001';
+const SAVED_PLAN_KEY = 'study-planner:saved-plan';
+
+function readSavedPlan() {
+  try {
+    const savedPlan = localStorage.getItem(SAVED_PLAN_KEY);
+
+    return savedPlan ? (JSON.parse(savedPlan) as StudyPlan) : null;
+  } catch (error) {
+    console.error('保存済み計画の読み込みに失敗しました。', error);
+    localStorage.removeItem(SAVED_PLAN_KEY);
+
+    return null;
+  }
+}
 
 function App() {
-  const [subject, setSubject] = useState('英語');
+  const [savedPlan] = useState<StudyPlan | null>(() => readSavedPlan());
+  const [subject, setSubject] = useState(savedPlan?.subject ?? '英語');
   const [examDate, setExamDate] = useState(
-    dayjs().add(30, 'day').format('YYYY-MM-DD')
+    savedPlan?.examDate ?? dayjs().add(30, 'day').format('YYYY-MM-DD')
   );
   const [testTitle, setTestTitle] = useState('テスト');
 
@@ -30,7 +45,7 @@ function App() {
   ]);
 
   const [studyHoursPerDay, setStudyHoursPerDay] = useState('2');
-  const [plan, setPlan] = useState<StudyPlan | null>(null);
+  const [plan, setPlan] = useState<StudyPlan | null>(savedPlan);
 
   const [chatInput, setChatInput] = useState('今日の勉強の進め方を教えて');
   const [answer, setAnswer] = useState('AIに質問して、勉強のコツを聞けます。');
@@ -54,6 +69,15 @@ function App() {
       date,
       items,
     }));
+  }, [plan]);
+
+  useEffect(() => {
+    if (!plan) {
+      localStorage.removeItem(SAVED_PLAN_KEY);
+      return;
+    }
+
+    localStorage.setItem(SAVED_PLAN_KEY, JSON.stringify(plan));
   }, [plan]);
 
   const normalizeScopeItem = (item: ScopeItem) => {
@@ -237,7 +261,7 @@ function App() {
           />
 
           <PlanPreview
-            subject={subject}
+            subject={plan?.subject ?? subject}
             plan={plan}
             groupedPlan={groupedPlan}
           />
