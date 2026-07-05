@@ -36,6 +36,34 @@ async function generateGeminiText(prompt) {
   return response.text;
 }
 
+function normalizePlanDetails(plan) {
+  return {
+    ...plan,
+    plan: Array.isArray(plan.plan)
+      ? plan.plan.map((item) => {
+          const details = Array.isArray(item.details)
+            ? item.details
+                .map((detail) => String(detail).trim())
+                .filter(Boolean)
+            : String(item.detail || '')
+                .split(/\n+/)
+                .map((detail) => detail.replace(/^・/, '').trim())
+                .filter(Boolean);
+
+          if (details.length % 2 === 1) {
+            details.push('');
+          }
+
+          return {
+            ...item,
+            detail: String(item.detail || ''),
+            details,
+          };
+        })
+      : [],
+  };
+}
+
 function createFallbackAnswer(message, plan) {
   const lower = message.toLowerCase();
 
@@ -59,7 +87,32 @@ async function buildPlanWithAI(payload) {
 
   const prompt = `
 以下の条件から、1日ごとの具体的な学習計画をJSONフォーマットで作成してください。
-各日の「detail」には、その範囲に合わせた具体的で実践的な勉強法のアドバイスを記載してください。
+各日の予定は、画面側で箇条書き表示できるように details 配列で返してください。
+
+【details のルール】
+・details は必ず配列にしてください。
+・details は [やること, アドバイス, やること, アドバイス] の順番にしてください。
+・details の要素数は必ず偶数にしてください。
+・1つの「やること」に対して、次の要素に短いアドバイスを書いてください。
+・やることはページ数や問題数がわかる具体的な行動にしてください。
+・アドバイスは一言で、やるときのコツや注意点を書いてください。
+・1つの要素に複数分野をまとめて書くことは禁止です。
+・「単語は〜。文法は〜。」のような説明文は禁止です。
+・detail には details 全体を短くまとめた予備文だけを書いてください。
+
+良い例:
+"details": [
+  "単語p.1-20を音読する",
+  "意味を隠して即答できるか確認する",
+  "文法p.1-10の例題を解く",
+  "間違えた問題だけ解説を読み直す"
+]
+
+悪い例:
+"details": [
+  "単語p.1-20、文法p.1-10、長文p.1-5",
+  "単語は音読し意味を確認。文法は例題を解く。"
+]
 
 【条件】
 ・科目: ${payload.subject}
@@ -75,8 +128,8 @@ async function buildPlanWithAI(payload) {
 ・計画は必ず今日の日付から試験日 ${payload.examDate} までの範囲で作成してください。
 ・長くても1か月以内の計画にしてください。
 ・各予定の date は YYYY-MM-DD 形式にしてください。
-・２行以内にしてください。
 ・JSON以外の文章やMarkdownは返さないでください。
+・details が空の予定を作らないでください。
 
 【出力フォーマット】
 {
@@ -89,7 +142,13 @@ async function buildPlanWithAI(payload) {
       "date": "YYYY-MM-DD",
       "title": "やるべきことのタイトル",
       "focus": "その日の重点項目",
-      "detail": "具体的で実践的な勉強アドバイス",
+      "detail": "今日の学習内容の短い予備説明",
+      "details": [
+        "問題集p.12-15を解く",
+        "間違えた問題には印をつける",
+        "重要語句を10個覚える",
+        "赤シートで即答できるか確認する"
+      ],
       "type": "study"
     }
   ]
@@ -102,7 +161,7 @@ async function buildPlanWithAI(payload) {
 
     const outputText = extractJsonText(text);
     const parsedPlan = JSON.parse(outputText);
-    return parsedPlan;
+    return normalizePlanDetails(parsedPlan);
   } catch (error) {
     console.error('AI計画生成エラー:', error.message);
     return buildPlanFallback(payload);
@@ -139,6 +198,12 @@ function buildPlanFallback(payload) {
       title: `${payload.subject} の学習`,
       focus: topic,
       detail: `${studyHours}時間の学習プラン。要点の整理と問題演習をセットで行います。`,
+      details: [
+        `${topic}の要点を整理する`,
+        `${studyHours}時間を目安に、重要な部分をノートにまとめる`,
+        `${topic}の問題演習を行う`,
+        '間違えた問題だけ印をつけて復習する',
+      ],
       type: 'study',
     });
   }
@@ -149,6 +214,10 @@ function buildPlanFallback(payload) {
       title: payload.taskTitle,
       focus: '提出課題',
       detail: '締切に合わせて仕上げる。必要なら最後に見直しを入れます。',
+      details: [
+        payload.taskTitle,
+        '締切に間に合うように仕上げ、最後に見直しを入れる',
+      ],
       type: 'task',
     });
   }

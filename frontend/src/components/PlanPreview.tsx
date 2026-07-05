@@ -6,7 +6,6 @@ import {
   Chip,
   List,
   ListItem,
-  ListItemText,
   Typography,
 } from '@mui/material';
 import { CalendarMonth } from '@mui/icons-material';
@@ -36,6 +35,15 @@ interface PlanPreviewProps {
   subject: string;
   plan: StudyPlan | null;
   groupedPlan: Array<{ date: string; items: PlanItem[] }>;
+}
+
+function createDetailRows(details?: string[]) {
+  if (!details?.length) return [];
+
+  return Array.from({ length: Math.ceil(details.length / 2) }).map((_, index) => ({
+    todo: details[index * 2] ?? '',
+    advice: details[index * 2 + 1] ?? '',
+  }));
 }
 
 export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
@@ -114,6 +122,7 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
                     {entry.items.map((item) => {
                       const colors =
                         focusColorMap.get(item.focus) ?? overflowFocusColor;
+                      const detailRows = createDetailRows(item.details);
 
                       return (
                         <ListItem
@@ -125,19 +134,42 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
                             bgcolor: colors.bg,
                           }}
                         >
-                          <ListItemText
-                            primary={
+                          <Box sx={{ width: '100%' }}>
+                            <Typography
+                              sx={{
+                                color: colors.chipText,
+                                fontWeight: 600,
+                                mb: 0.75,
+                              }}
+                            >
+                              {item.type === 'test' ? item.title : item.focus}
+                            </Typography>
+
+                            {detailRows.length ? (
+                              <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+                                {detailRows.map((row, index) => (
+                                  <Typography
+                                    component="li"
+                                    variant="body2"
+                                    color="text.secondary"
+                                    key={`${row.todo}-${index}`}
+                                    sx={{ mb: 0.4 }}
+                                  >
+                                    {row.todo}
+                                    {row.advice ? `　${row.advice}` : ''}
+                                  </Typography>
+                                ))}
+                              </Box>
+                            ) : (
                               <Typography
-                                sx={{
-                                  color: colors.chipText,
-                                  fontWeight: 600,
-                                }}
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ whiteSpace: 'pre-line' }}
                               >
-                                {item.type === 'test' ? item.title : item.focus}
+                                {item.detail}
                               </Typography>
-                            }
-                            secondary={item.detail}
-                          />
+                            )}
+                          </Box>
                         </ListItem>
                       );
                     })}

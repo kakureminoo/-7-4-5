@@ -3,6 +3,7 @@ export interface PlanItem {
   title: string;
   focus: string;
   detail: string;
+  details?: string[];
   type: 'study' | 'task' | 'test';
 }
 

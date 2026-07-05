@@ -171,6 +171,10 @@ function App() {
                 focus: 'テスト',
                 detail:
                   '試験日です。直前は新しい範囲を増やしすぎず、確認と復習を中心にします。',
+                details: [
+                  testTitle,
+                  '直前は新しい範囲を増やしすぎず、確認と復習を中心にします。',
+                ],
                 type: 'test' as const,
               },
             ].sort((a, b) => a.date.localeCompare(b.date)),
