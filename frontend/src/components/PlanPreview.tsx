@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
+import 'dayjs/locale/ja';
 import {
   Box,
   Button,
@@ -13,6 +14,8 @@ import {
 import { CalendarMonth, Download } from '@mui/icons-material';
 
 import type { PlanItem, StudyPlan } from '../types';
+
+dayjs.locale('ja');
 
 const primaryBlue = '#3b82f6';
 
