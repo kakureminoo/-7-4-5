@@ -51,6 +51,7 @@ function App() {
   const [answer, setAnswer] = useState('AIに質問して、勉強のコツを聞けます。');
 
   const [loading, setLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [showScopeError, setShowScopeError] = useState(false);
   const [showDeadlineError, setShowDeadlineError] = useState(false);
 
@@ -211,9 +212,12 @@ function App() {
   };
 
   const askAi = async () => {
-    if (!plan) return;
+    if (!plan || chatLoading) return;
 
     try {
+      setChatLoading(true);
+      setAnswer('回答を生成しています...');
+
       const res = await axios.post(`${API_BASE}/api/chat`, {
         message: chatInput,
         plan,
@@ -223,6 +227,8 @@ function App() {
     } catch (error) {
       console.error(error);
       setAnswer('AIチャットの通信に失敗しました。backendが起動しているか確認してください。');
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -280,6 +286,7 @@ function App() {
               chatInput={chatInput}
               answer={answer}
               disabled={!plan}
+              loading={chatLoading}
               onChatInputChange={setChatInput}
               onAsk={askAi}
             />

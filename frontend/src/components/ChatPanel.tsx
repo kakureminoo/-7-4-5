@@ -13,6 +13,7 @@ interface ChatPanelProps {
   chatInput: string;
   answer: string;
   disabled: boolean;
+  loading: boolean;
   onChatInputChange: (value: string) => void;
   onAsk: () => void;
 }
@@ -21,6 +22,7 @@ export function ChatPanel({
   chatInput,
   answer,
   disabled,
+  loading,
   onChatInputChange,
   onAsk,
 }: ChatPanelProps) {
@@ -56,7 +58,7 @@ export function ChatPanel({
         <Button
           variant="outlined"
           onClick={onAsk}
-          disabled={disabled}
+          disabled={disabled || loading}
           sx={{
             px: 4,
             minWidth: 112,
@@ -66,7 +68,7 @@ export function ChatPanel({
             whiteSpace: 'nowrap',
           }}
         >
-          質問する
+          {loading ? '生成中...' : '質問する'}
         </Button>
       </Box>
 
