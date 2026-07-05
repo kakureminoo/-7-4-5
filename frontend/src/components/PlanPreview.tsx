@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import dayjs from 'dayjs';
 import {
   Box,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   List,
   ListItem,
@@ -47,6 +49,22 @@ function createDetailRows(details?: string[]) {
 }
 
 export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
+  const [checkedTasks, setCheckedTasks] = useState<Set<string>>(() => new Set());
+
+  const toggleTask = (taskKey: string) => {
+    setCheckedTasks((current) => {
+      const next = new Set(current);
+
+      if (next.has(taskKey)) {
+        next.delete(taskKey);
+      } else {
+        next.add(taskKey);
+      }
+
+      return next;
+    });
+  };
+
   const focusColorMap = new Map<
     string,
     typeof focusColorPalette[number]
@@ -146,19 +164,49 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
                             </Typography>
 
                             {detailRows.length ? (
-                              <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
-                                {detailRows.map((row, index) => (
-                                  <Typography
-                                    component="li"
-                                    variant="body2"
-                                    color="text.secondary"
-                                    key={`${row.todo}-${index}`}
-                                    sx={{ mb: 0.4 }}
-                                  >
-                                    {row.todo}
-                                    {row.advice ? `　${row.advice}` : ''}
-                                  </Typography>
-                                ))}
+                              <Box sx={{ display: 'grid', gap: 0.75 }}>
+                                {detailRows.map((row, index) => {
+                                  const taskKey = `${entry.date}-${item.title}-${item.focus}-${index}-${row.todo}`;
+                                  const checked = checkedTasks.has(taskKey);
+
+                                  return (
+                                    <Box
+                                      key={taskKey}
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: 1,
+                                      }}
+                                    >
+                                      <Checkbox
+                                        checked={checked}
+                                        onChange={() => toggleTask(taskKey)}
+                                        size="small"
+                                        sx={{
+                                          color: colors.chipText,
+                                          mt: -0.35,
+                                          p: 0.25,
+                                          '&.Mui-checked': {
+                                            color: colors.chipText,
+                                          },
+                                        }}
+                                      />
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{
+                                          opacity: checked ? 0.65 : 1,
+                                          textDecoration: checked
+                                            ? 'line-through'
+                                            : 'none',
+                                        }}
+                                      >
+                                        {row.todo}
+                                        {row.advice ? ` ${row.advice}` : ''}
+                                      </Typography>
+                                    </Box>
+                                  );
+                                })}
                               </Box>
                             ) : (
                               <Typography

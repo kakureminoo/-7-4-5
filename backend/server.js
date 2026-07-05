@@ -36,30 +36,39 @@ async function generateGeminiText(prompt) {
   return response.text;
 }
 
+function normalizeDetails(item) {
+  if (Array.isArray(item.details)) {
+    const details = item.details
+      .map((detail) => String(detail).trim())
+      .filter(Boolean);
+
+    return details.length % 2 === 0 ? details : [...details, ''];
+  }
+
+  if (Array.isArray(item.tasks)) {
+    return item.tasks.flatMap((task) => [
+      String(task.todo || '').trim(),
+      String(task.advice || '').trim(),
+    ]).filter(Boolean);
+  }
+
+  const details = String(item.detail || '')
+    .split(/\n+/)
+    .map((detail) => detail.replace(/^・/, '').trim())
+    .filter(Boolean);
+
+  return details.length % 2 === 0 ? details : [...details, ''];
+}
+
 function normalizePlanDetails(plan) {
   return {
     ...plan,
     plan: Array.isArray(plan.plan)
-      ? plan.plan.map((item) => {
-          const details = Array.isArray(item.details)
-            ? item.details
-                .map((detail) => String(detail).trim())
-                .filter(Boolean)
-            : String(item.detail || '')
-                .split(/\n+/)
-                .map((detail) => detail.replace(/^・/, '').trim())
-                .filter(Boolean);
-
-          if (details.length % 2 === 1) {
-            details.push('');
-          }
-
-          return {
-            ...item,
-            detail: String(item.detail || ''),
-            details,
-          };
-        })
+      ? plan.plan.map((item) => ({
+          ...item,
+          detail: String(item.detail || ''),
+          details: normalizeDetails(item),
+        }))
       : [],
   };
 }
@@ -68,37 +77,37 @@ function createFallbackAnswer(message, plan) {
   const lower = message.toLowerCase();
 
   if (lower.includes('勉強')) {
-    return 'まずは1日の最初に基礎を30分、午後に問題演習を30分、夜に復習を30分に分けると進めやすいです。';
+    return 'まずは今日の予定を1つ選び、やることを短い時間で区切って進めるのがおすすめです。';
   }
 
   if (lower.includes('計画') && plan) {
-    return `現在の計画では ${plan.subject} の試験まで ${plan.plan.length} 件の学習タスクを組み込んでいます。優先度の高い項目から順に進めるのが効果的です。`;
+    return `現在の計画では、${plan.subject}の予定が${plan.plan.length}件あります。苦手な範囲から優先すると進めやすいです。`;
   }
 
-  return '試験勉強なら、毎日少しずつでも続けることが大切です。まずは今日の予定を1つだけ確実に完了させましょう。';
+  return '試験勉強は、毎日少しずつ続けることが大切です。今日の予定を1つずつ確実に終わらせましょう。';
 }
 
-// AI計画生成ロジック
 async function buildPlanWithAI(payload) {
   if (!process.env.GEMINI_API_KEY) {
-    console.log('Gemini API Keyが見つからないため、固定ロジックで生成します。');
+    console.log('Gemini API key was not found. Using fallback plan.');
     return buildPlanFallback(payload);
   }
 
   const prompt = `
-以下の条件から、1日ごとの具体的な学習計画をJSONフォーマットで作成してください。
-各日の予定は、画面側で箇条書き表示できるように details 配列で返してください。
+以下の条件から、1日ごとの具体的な学習計画をJSONだけで作成してください。
 
-【details のルール】
-・details は必ず配列にしてください。
-・details は [やること, アドバイス, やること, アドバイス] の順番にしてください。
-・details の要素数は必ず偶数にしてください。
-・1つの「やること」に対して、次の要素に短いアドバイスを書いてください。
-・やることはページ数や問題数がわかる具体的な行動にしてください。
-・アドバイスは一言で、やるときのコツや注意点を書いてください。
-・1つの要素に複数分野をまとめて書くことは禁止です。
-・「単語は〜。文法は〜。」のような説明文は禁止です。
-・detail には details 全体を短くまとめた予備文だけを書いてください。
+
+【重要】
+各日の予定は必ず details 配列で返してください。
+details は [やること, アドバイス, やること, アドバイス] の順番にしてください。
+details の要素数は必ず偶数にしてください。
+
+【details の書き方】
+・やること: ページ数や問題数がわかる具体的な行動を書く
+・アドバイス: その行動を進めるときの短いコツを書く
+・1つのやることに複数分野をまとめない
+・「単語は〜。文法は〜。」のような説明文にしない
+・detail は予備表示用の短い説明だけにする
 
 良い例:
 "details": [
@@ -117,19 +126,19 @@ async function buildPlanWithAI(payload) {
 【条件】
 ・科目: ${payload.subject}
 ・試験日: ${payload.examDate}
-・試験範囲: ${payload.scope}
+・試験範囲:
+${payload.scope}
 ・提出課題: ${payload.taskTitle || 'なし'}
 ・課題締切: ${payload.taskDeadline || payload.examDate}
 ・1日の学習時間: ${payload.studyHoursPerDay || 2}時間
 
 【ルール】
 ・今日の日付: ${dayjs().format('YYYY-MM-DD')}
-・計画は必ず今日の日付から開始してください。
-・計画は必ず今日の日付から試験日 ${payload.examDate} までの範囲で作成してください。
-・長くても1か月以内の計画にしてください。
-・各予定の date は YYYY-MM-DD 形式にしてください。
-・JSON以外の文章やMarkdownは返さないでください。
-・details が空の予定を作らないでください。
+・計画は今日の日付から始める
+・計画は試験日 ${payload.examDate} までの範囲で作成する
+・長くても1か月以内の計画にする
+・各予定の date は YYYY-MM-DD 形式にする
+・JSON以外の文章やMarkdownは返さない
 
 【出力フォーマット】
 {
@@ -140,9 +149,9 @@ async function buildPlanWithAI(payload) {
   "plan": [
     {
       "date": "YYYY-MM-DD",
-      "title": "やるべきことのタイトル",
+      "title": "今日の学習",
       "focus": "その日の重点項目",
-      "detail": "今日の学習内容の短い予備説明",
+      "detail": "今日の学習内容の短い説明",
       "details": [
         "問題集p.12-15を解く",
         "間違えた問題には印をつける",
@@ -168,7 +177,6 @@ async function buildPlanWithAI(payload) {
   }
 }
 
-// 予備Fallbackロジック
 function buildPlanFallback(payload) {
   const start = dayjs();
   const examDate = dayjs(payload.examDate);
@@ -176,7 +184,7 @@ function buildPlanFallback(payload) {
 
   const totalDays = Math.max(
     1,
-    Math.min(90, examDate.diff(start, 'day') + 1)
+    Math.min(31, examDate.diff(start, 'day') + 1)
   );
 
   const scopeItems = (payload.scope || '')
@@ -195,12 +203,12 @@ function buildPlanFallback(payload) {
 
     plan.push({
       date: currentDate,
-      title: `${payload.subject} の学習`,
+      title: `${payload.subject}の学習`,
       focus: topic,
-      detail: `${studyHours}時間の学習プラン。要点の整理と問題演習をセットで行います。`,
+      detail: `${studyHours}時間を目安に、要点整理と問題演習を行います。`,
       details: [
         `${topic}の要点を整理する`,
-        `${studyHours}時間を目安に、重要な部分をノートにまとめる`,
+        '重要な語句や公式をノートにまとめる',
         `${topic}の問題演習を行う`,
         '間違えた問題だけ印をつけて復習する',
       ],
@@ -213,7 +221,7 @@ function buildPlanFallback(payload) {
       date: deadlineDate.format('YYYY-MM-DD'),
       title: payload.taskTitle,
       focus: '提出課題',
-      detail: '締切に合わせて仕上げる。必要なら最後に見直しを入れます。',
+      detail: '締切に合わせて仕上げます。',
       details: [
         payload.taskTitle,
         '締切に間に合うように仕上げ、最後に見直しを入れる',
@@ -229,7 +237,7 @@ function buildPlanFallback(payload) {
     examDate: examDate.format('YYYY-MM-DD'),
     deadline: deadlineDate.format('YYYY-MM-DD'),
     plan,
-    summary: `${payload.subject} を ${totalDays} 日で進める学習計画です。`,
+    summary: `${payload.subject}を${totalDays}日で進める学習計画です。`,
   };
 }
 
@@ -237,7 +245,6 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-// 保存済み計画の取得
 app.get('/api/plans', async (_req, res) => {
   try {
     const { data, error } = await supabase
@@ -256,7 +263,6 @@ app.get('/api/plans', async (_req, res) => {
   }
 });
 
-// 学習計画生成 + Supabase保存
 app.post('/api/generate-plan', async (req, res) => {
   try {
     const plan = await buildPlanWithAI(req.body);
@@ -280,7 +286,6 @@ app.post('/api/generate-plan', async (req, res) => {
   }
 });
 
-// チャット機能
 app.post('/api/chat', async (req, res) => {
   const { message, plan } = req.body;
 
