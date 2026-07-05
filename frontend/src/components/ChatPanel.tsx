@@ -46,11 +46,10 @@ export function ChatPanel({
         }}
       >
         <TextField
-          label="質問する"
+          label="質問を入力"
           value={chatInput}
           onChange={(e) => onChatInputChange(e.target.value)}
           placeholder={disabled ? '計画を作成するとAIに質問できます' : undefined}
-          disabled={disabled}
           fullWidth
         />
 
@@ -60,8 +59,11 @@ export function ChatPanel({
           disabled={disabled}
           sx={{
             px: 4,
+            minWidth: 112,
             borderRadius: 3,
+            flexShrink: 0,
             fontWeight: 600,
+            whiteSpace: 'nowrap',
           }}
         >
           質問する
