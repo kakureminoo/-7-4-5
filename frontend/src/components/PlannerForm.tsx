@@ -76,7 +76,7 @@ export function PlannerForm(props: PlannerFormProps) {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {props.showDeadlineError && (
               <Alert severity="warning" sx={{ borderRadius: 3 }}>
-                期限は今日より後、かつ3か月以内の日付を入力してください。
+                期限は今日より後、かつ1か月以内の日付を入力してください。
               </Alert>
             )}
 

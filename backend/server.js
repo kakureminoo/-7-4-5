@@ -70,9 +70,12 @@ async function buildPlanWithAI(payload) {
 ・1日の学習時間: ${payload.studyHoursPerDay || 2}時間
 
 【ルール】
-・今日から試験日までの範囲で作成してください。
-・長くても3か月以内の計画にしてください。
-・無理のない分量にしてください。
+・今日の日付: ${dayjs().format('YYYY-MM-DD')}
+・計画は必ず今日の日付から開始してください。
+・計画は必ず今日の日付から試験日 ${payload.examDate} までの範囲で作成してください。
+・長くても1か月以内の計画にしてください。
+・各予定の date は YYYY-MM-DD 形式にしてください。
+・２行以内にしてください。
 ・JSON以外の文章やMarkdownは返さないでください。
 
 【出力フォーマット】
@@ -98,7 +101,8 @@ async function buildPlanWithAI(payload) {
     console.log('Gemini raw plan response:', text);
 
     const outputText = extractJsonText(text);
-    return JSON.parse(outputText);
+    const parsedPlan = JSON.parse(outputText);
+    return parsedPlan;
   } catch (error) {
     console.error('AI計画生成エラー:', error.message);
     return buildPlanFallback(payload);

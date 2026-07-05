@@ -115,7 +115,7 @@ function App() {
 
     const isInvalidDeadline =
       !deadlineDate.isAfter(dayjs(), 'day') ||
-      deadlineDate.isAfter(dayjs().add(3, 'month'), 'day');
+      deadlineDate.isAfter(dayjs().add(1, 'month'), 'day');
 
     const hasBlankScope = scopeItems.some(
       (item) =>

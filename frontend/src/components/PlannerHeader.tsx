@@ -43,7 +43,7 @@ export function PlannerHeader() {
           lineHeight: 1.8,
         }}
       >
-        試験日・範囲・提出課題から、3か月以内で終わる学習スケジュールを作成します。
+        試験日・範囲・提出課題から、1か月以内で終わる学習スケジュールを作成します。
       </Typography>
     </Paper>
   );

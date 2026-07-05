@@ -88,7 +88,7 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
           </Box>
 
           <Chip
-            label="3か月以内"
+            label="1か月以内"
             sx={{
               bgcolor: '#dcfce7',
               color: '#15803d',
