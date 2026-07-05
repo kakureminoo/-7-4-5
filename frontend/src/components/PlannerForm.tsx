@@ -100,7 +100,7 @@ export function PlannerForm(props: PlannerFormProps) {
 
             {props.showScopeError && (
               <Alert severity="warning" sx={{ borderRadius: 3 }}>
-                範囲に空欄があります。参考書・章・分野、開始ページ、終了ページを入力してください。
+                範囲に空欄があります。参考書・分野、開始ページ、終了ページを入力してください。
               </Alert>
             )}
 
@@ -118,7 +118,7 @@ export function PlannerForm(props: PlannerFormProps) {
                 }}
               >
                 <TextField
-                  label="参考書・章・分野"
+                  label="参考書・分野"
                   value={item.name}
                   onChange={(e) =>
                     props.onScopeItemChange(index, 'name', e.target.value)
