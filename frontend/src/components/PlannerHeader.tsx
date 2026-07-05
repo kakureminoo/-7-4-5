@@ -32,7 +32,7 @@ export function PlannerHeader() {
           fontSize: { xs: 32, md: 44 },
         }}
       >
-        テスト勉強プランナー
+        キョウこれ
       </Typography>
 
       <Typography

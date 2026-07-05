@@ -100,7 +100,7 @@ export function PlannerForm(props: PlannerFormProps) {
 
             {props.showScopeError && (
               <Alert severity="warning" sx={{ borderRadius: 3 }}>
-                範囲に空欄があります。参考書・章・分野、開始p、終了pを入力してください。
+                範囲に空欄があります。参考書・章・分野、開始ページ、終了ページを入力してください。
               </Alert>
             )}
 
@@ -134,7 +134,7 @@ export function PlannerForm(props: PlannerFormProps) {
                 />
 
                 <TextField
-                  label="開始p"
+                  label="開始ページ"
                   type="number"
                   value={item.startPage}
                   onChange={(e) =>
@@ -150,7 +150,7 @@ export function PlannerForm(props: PlannerFormProps) {
                 />
 
                 <TextField
-                  label="終了p"
+                  label="終了ページ"
                   type="number"
                   value={item.endPage}
                   onChange={(e) =>
@@ -186,15 +186,6 @@ export function PlannerForm(props: PlannerFormProps) {
               範囲を追加
             </Button>
           </Box>
-
-          <TextField
-            label="1日あたりの学習時間（時間）"
-            type="number"
-            value={props.studyHoursPerDay}
-            onChange={(e) => props.onStudyHoursChange(e.target.value)}
-            slotProps={{ htmlInput: { min: 0.5, step: 0.5 } }}
-            fullWidth
-          />
 
           <Button
             variant="contained"

@@ -5,7 +5,6 @@ import {
   Card,
   CardContent,
   Checkbox,
-  Chip,
   List,
   ListItem,
   Typography,
@@ -24,13 +23,18 @@ const focusColorPalette = [
   { bg: '#fefce8', border: '#fde68a', chipText: '#713f12' },
   { bg: '#f0fdfa', border: '#99f6e4', chipText: '#134e4a' },
   { bg: '#fdf2f8', border: '#fbcfe8', chipText: '#831843' },
-  { bg: '#f8fafc', border: '#cbd5e1', chipText: '#334155' },
 ];
 
 const overflowFocusColor = {
   bg: '#f8fafc',
   border: '#cbd5e1',
   chipText: '#334155',
+};
+
+const testColor = {
+  bg: '#fef2f2',
+  border: '#fecaca',
+  chipText: '#991b1b',
 };
 
 interface PlanPreviewProps {
@@ -77,7 +81,7 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
       const nextIndex = focusColorMap.size;
       focusColorMap.set(
         item.focus,
-        focusColorPalette[nextIndex] ?? overflowFocusColor
+        focusColorPalette[nextIndex % focusColorPalette.length]
       );
     });
   }
@@ -113,14 +117,6 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
             </Box>
           </Box>
 
-          <Chip
-            label="1か月以内"
-            sx={{
-              bgcolor: '#dcfce7',
-              color: '#15803d',
-              fontWeight: 600,
-            }}
-          />
         </Box>
 
         {plan ? (
@@ -138,8 +134,11 @@ export function PlanPreview({ subject, plan, groupedPlan }: PlanPreviewProps) {
 
                   <List disablePadding>
                     {entry.items.map((item) => {
+                      const isTestDate = entry.date === plan.examDate;
                       const colors =
-                        focusColorMap.get(item.focus) ?? overflowFocusColor;
+                        isTestDate
+                          ? testColor
+                          : focusColorMap.get(item.focus) ?? overflowFocusColor;
                       const detailRows = createDetailRows(item.details);
 
                       return (

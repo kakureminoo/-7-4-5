@@ -5,11 +5,8 @@ import {
   Box,
   Card,
   CardContent,
-  Chip,
   Container,
-  Typography,
 } from '@mui/material';
-import { TaskAlt } from '@mui/icons-material';
 
 import type { PlanItem, ScopeItem, StudyPlan } from './types';
 import { PlannerHeader } from './components/PlannerHeader';
@@ -265,30 +262,6 @@ function App() {
           </CardContent>
         </Card>
 
-        <Card
-          elevation={0}
-          sx={{
-            mt: 3,
-            borderRadius: 4,
-            border: '1px solid #e2e8f0',
-          }}
-        >
-          <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <TaskAlt color="primary" />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                今すぐやること
-              </Typography>
-            </Box>
-
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              <Chip label="期限を設定" />
-              <Chip label="範囲を入力" />
-              <Chip label="学習時間を決める" />
-              <Chip label="AIに相談" />
-            </Box>
-          </CardContent>
-        </Card>
       </Container>
     </Box>
   );
